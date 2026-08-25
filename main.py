@@ -1,4 +1,4 @@
-ffrom fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 app = FastAPI()
@@ -36,7 +36,6 @@ def chess_game():
         <script>
             const game = new Chess();
             
-            // Map chess.js piece objects to Unicode symbols
             const pieceSymbols = {
                 'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
                 'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔'
@@ -56,7 +55,6 @@ def chess_game():
                         const isDark = (r + c) % 2 === 1;
                         square.className = `square ${isDark ? 'dark' : 'light'}`;
                         
-                        // Convert row/col to algebraic notation (e.g., 'a4')
                         const file = String.fromCharCode(97 + c);
                         const rank = 8 - r;
                         const squareID = file + rank;
@@ -80,24 +78,21 @@ def chess_game():
 
             function handleSquareClick(squareID) {
                 if (selectedSquare === null) {
-                    // Select a piece if it belongs to the current turn
                     const piece = game.get(squareID);
                     if (piece && piece.color === game.turn()) {
                         selectedSquare = squareID;
                         renderBoard();
                     }
                 } else {
-                    // Attempt to make a move
                     const move = game.move({
                         from: selectedSquare,
                         to: squareID,
-                        promotion: 'q' // auto-promote pawns to queen for simplicity
+                        promotion: 'q'
                     });
 
                     selectedSquare = null;
 
                     if (move === null) {
-                        // If illegal move, check if they clicked another of their own pieces to switch selection
                         const piece = game.get(squareID);
                         if (piece && piece.color === game.turn()) {
                             selectedSquare = squareID;
