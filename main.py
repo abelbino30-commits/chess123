@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+ffrom fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 app = FastAPI()
@@ -10,6 +10,8 @@ def chess_game():
     <html>
     <head>
         <title>Mini Chess Game</title>
+        <!-- Include chess.js for robust legal move validation -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
         <style>
             body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; background-color: #f4f4f9; }
             .card { background: white; padding: 20px; border-radius: 12px; display: inline-block; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); }
@@ -25,88 +27,106 @@ def chess_game():
     </head>
     <body>
         <div class="card">
-            <h2>♟️ Mini Chess Board</h2>
-            <div id="status">White's Turn (Click a piece to move)</div>
+            <h2>♟️ Interactive Chess Board</h2>
+            <div id="status">White's Turn</div>
             <div class="board" id="board"></div>
             <button onclick="resetGame()">Reset Game</button>
         </div>
 
         <script>
-            const pieces = {
-                'r': '∜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-                'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙',
-                '': ''
+            const game = new Chess();
+            
+            // Map chess.js piece objects to Unicode symbols
+            const pieceSymbols = {
+                'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚',
+                'P': '♙', 'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔'
             };
 
-            let board = [
-                ['r','n','b','q','k','b','n','r'],
-                ['p','p','p','p','p','p','p','p'],
-                ['','','','','','','',''],
-                ['','','','','','','',''],
-                ['','','','','','','',''],
-                ['','','','','','','',''],
-                ['P','P','P','P','P','P','P','P'],
-                ['R','N','B','Q','K','B','N','R']
-            ];
-
-            let turn = 'White';
-            let selectedPiece = null;
+            let selectedSquare = null;
 
             function renderBoard() {
                 const boardEl = document.getElementById('board');
                 boardEl.innerHTML = '';
+                
+                const boardState = game.board();
+                
                 for (let r = 0; r < 8; r++) {
                     for (let c = 0; c < 8; c++) {
                         const square = document.createElement('div');
                         const isDark = (r + c) % 2 === 1;
                         square.className = `square ${isDark ? 'dark' : 'light'}`;
-                        if (selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
+                        
+                        // Convert row/col to algebraic notation (e.g., 'a4')
+                        const file = String.fromCharCode(97 + c);
+                        const rank = 8 - r;
+                        const squareID = file + rank;
+
+                        if (selectedSquare === squareID) {
                             square.classList.add('selected');
                         }
-                        
-                        const pieceCode = board[r][c];
-                        square.innerText = pieceCode ? pieces[pieceCode] : '';
-                        square.onclick = () => handleSquareClick(r, c);
+
+                        const piece = boardState[r][c];
+                        if (piece) {
+                            const symbolKey = piece.color === 'w' ? piece.type.toUpperCase() : piece.type;
+                            square.innerText = pieceSymbols[symbolKey] || '';
+                        }
+
+                        square.onclick = () => handleSquareClick(squareID);
                         boardEl.appendChild(square);
                     }
                 }
+                updateStatus();
             }
 
-            function handleSquareClick(r, c) {
-                const piece = board[r][c];
-                
-                if (selectedPiece) {
-                    // Move piece
-                    board[r][c] = board[selectedPiece.r][selectedPiece.c];
-                    board[selectedPiece.r][selectedPiece.c] = '';
-                    selectedPiece = null;
-                    turn = turn === 'White' ? 'Black' : 'White';
-                    document.getElementById('status').innerText = `${turn}'s Turn`;
-                    renderBoard();
-                } else if (piece) {
-                    // Select piece
-                    const isWhite = piece === piece.toUpperCase();
-                    if ((turn === 'White' && isWhite) || (turn === 'Black' && !isWhite)) {
-                        selectedPiece = { r, c };
+            function handleSquareClick(squareID) {
+                if (selectedSquare === null) {
+                    // Select a piece if it belongs to the current turn
+                    const piece = game.get(squareID);
+                    if (piece && piece.color === game.turn()) {
+                        selectedSquare = squareID;
                         renderBoard();
                     }
+                } else {
+                    // Attempt to make a move
+                    const move = game.move({
+                        from: selectedSquare,
+                        to: squareID,
+                        promotion: 'q' // auto-promote pawns to queen for simplicity
+                    });
+
+                    selectedSquare = null;
+
+                    if (move === null) {
+                        // If illegal move, check if they clicked another of their own pieces to switch selection
+                        const piece = game.get(squareID);
+                        if (piece && piece.color === game.turn()) {
+                            selectedSquare = squareID;
+                        }
+                    }
+                    renderBoard();
                 }
             }
 
+            function updateStatus() {
+                let statusMsg = '';
+                const turnName = game.turn() === 'w' ? "White's Turn" : "Black's Turn";
+
+                if (game.in_checkmate()) {
+                    statusMsg = `Game Over! Checkmate. ${game.turn() === 'w' ? 'Black' : 'White'} wins!`;
+                } else if (game.in_draw()) {
+                    statusMsg = `Game Over! Drawn position.`;
+                } else {
+                    statusMsg = turnName;
+                    if (game.in_check()) {
+                        statusMsg += ` — CHECK!`;
+                    }
+                }
+                document.getElementById('status').innerText = statusMsg;
+            }
+
             function resetGame() {
-                board = [
-                    ['r','n','b','q','k','b','n','r'],
-                    ['p','p','p','p','p','p','p','p'],
-                    ['','','','','','','',''],
-                    ['','','','','','','',''],
-                    ['','','','','','','',''],
-                    ['','','','','','','',''],
-                    ['P','P','P','P','P','P','P','P'],
-                    ['R','N','B','Q','K','B','N','R']
-                ];
-                turn = 'White';
-                selectedPiece = null;
-                document.getElementById('status').innerText = "White's Turn (Click a piece to move)";
+                game.reset();
+                selectedSquare = null;
                 renderBoard();
             }
 
